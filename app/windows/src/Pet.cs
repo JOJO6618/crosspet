@@ -178,6 +178,8 @@ namespace CrossPet
                         if (last != null && Newer(Store.Version, last)) Js($"justUpdated({Q("v" + Store.Version)})");
                     }
                     ready = true;
+                    if (Store.Flag("gptQuota") && Store.Flag("astrionGptQuota")) { Store.Settings["astrionGptQuota"] = false; Store.SaveSettings(); }
+                    Js($"setGPTQuotaOptions({(Store.Flag("gptQuota") ? "true" : "false")}, {(Store.Flag("astrionGptQuota") ? "true" : "false")})");
                     ApplySizes(anchor: Anchor.Corner);   // 解锁过文字大小的：按画布重设窗口，左上角不动（锁着的尺寸不变）
                     After(1000, PassThroughBrowserWindows); After(5000, PassThroughBrowserWindows);   // 背后的浏览器窗口不接鼠标（见 PassThroughBrowserWindows）
                     stamps.Clear();

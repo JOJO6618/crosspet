@@ -15,4 +15,12 @@ import ServiceManagement
 import WebKit
 
 let defaults = UserDefaults.standard
+// 原有 AI 接入一律用 /tmp/crosspet；只有 Astrion 的状态文件允许放到 CROSSPET_STATE_DIR，
+// 这样给它一个自定义位置时，不会把老来源的状态、额度和 pet.pid 一起迁走
 let stateDir = URL(fileURLWithPath: "/tmp/crosspet", isDirectory: true)
+let astrionStateDir = URL(fileURLWithPath: ProcessInfo.processInfo.environment["CROSSPET_STATE_DIR"] ?? stateDir.path, isDirectory: true)
+
+/// astrion-*.json 与 seen-astrion 走 astrionStateDir，其它文件仍用原来的 stateDir
+func stateFile(_ name: String) -> URL {
+    (name.hasPrefix("astrion-") || name == "seen-astrion") ? astrionStateDir.appendingPathComponent(name) : stateDir.appendingPathComponent(name)
+}

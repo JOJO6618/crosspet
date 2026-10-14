@@ -35,7 +35,7 @@ namespace CrossPet
             var now = DateTime.UtcNow;
             // 等你回答：一直等到你回答（最长 10 分钟）；刚干完活：浮上来一会儿。
             // AI 在后台干活时不浮上来：选这个模式的人就是嫌挡路，干活时往往正是你切去忙别的
-            return lastPose.Values.Any(p => p.pose == "asking" ? (now - p.at).TotalMinutes < 10
+            return lastPose.Values.Concat(RecentAstrionPoses).Any(p => p.pose == "asking" ? (now - p.at).TotalMinutes < 10
                 : (now - p.at).TotalSeconds < 8 && (p.pose == "happy" || p.pose == "proud"));
         }
 

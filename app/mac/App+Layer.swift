@@ -14,7 +14,7 @@ extension App {
         if let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
            appToCharacter[front] != nil || hostApp(front) != nil { return true }
         let now = Date()
-        return lastPose.values.contains { p in
+        return (Array(lastPose.values) + recentAstrionPoses).contains { p in
             let age = now.timeIntervalSince(p.at)
             if p.pose == "asking" { return age < 600 }                        // 等你回答：一直等到你回答
             return age < 8 && ["happy", "proud"].contains(p.pose)              // 刚干完活：浮上来一会儿

@@ -51,7 +51,7 @@ extension App {
     /// AI 在干活 / 等你回答 / 刚干完（10 秒内）：跑出来
     var dockBusy: Bool {
         let now = Date()
-        return lastPose.values.contains { p in
+        return (Array(lastPose.values) + recentAstrionPoses).contains { p in
             guard p.at > dockedAt else { return false }
             let age = now.timeIntervalSince(p.at)
             switch p.pose {

@@ -107,10 +107,27 @@ extension App {
         js("setAuraMode(\(quote(mode)))")
     }
 
+    func syncGPTQuotaOptions() {
+        let codexOn = defaults.bool(forKey: "gptQuota")
+        if codexOn { defaults.set(false, forKey: "astrionGptQuota") }
+        js("setGPTQuotaOptions(\(codexOn), \(defaults.bool(forKey: "astrionGptQuota")))")
+    }
+
     @objc func toggleGPTQuota() {
         let on = !defaults.bool(forKey: "gptQuota")
         defaults.set(on, forKey: "gptQuota")
+        if on { defaults.set(false, forKey: "astrionGptQuota") }
+        syncGPTQuotaOptions()
         if on { refreshCodexQuota(.now) } else { js("setCodexQuota(null)") }
+        pushSettings()
+    }
+
+    func setAstrionGPTQuota(_ on: Bool) {
+        defaults.set(on, forKey: "astrionGptQuota")
+        if on { defaults.set(false, forKey: "gptQuota") }
+        syncGPTQuotaOptions()
+        if on { js("setCodexQuota(null)") }
+        pushSettings()
     }
 
     @objc func toggleLogin() {

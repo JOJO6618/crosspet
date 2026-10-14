@@ -51,8 +51,28 @@ namespace CrossPet
             }
             catch { return id; }
             var host = Store.ReadJson(file);
+            if (id == "astrion")
+            {
+                // Astrion 的状态随时在变：时间戳取不到、或者已经过了 45 秒，就不跟着它换。
+                // 前台切窗口是单独的回调，没有外层兜底，这里不能抛异常
+                if (host == null || !host.TryGetValue("ts", out var raw) || !TryUnixSeconds(raw, out var ts) || Math.Abs(Now - ts) > 45) return id;
+            }
             var c = host != null && host.TryGetValue("character", out var v) ? v as string : null;
             return c != null && Characters().Any(x => x.id == c) ? c : id;
+        }
+
+        /// <summary>把 JSON 里的时间戳读成秒：数字直接用，字符串尽量解析，取不到不抛异常。</summary>
+        static bool TryUnixSeconds(object value, out double seconds)
+        {
+            seconds = 0;
+            if (value == null) return false;
+            if (value is double || value is float || value is long || value is int)
+            {
+                seconds = Convert.ToDouble(value, System.Globalization.CultureInfo.InvariantCulture);
+                return true;
+            }
+            var text = value as string;
+            return text != null && double.TryParse(text, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out seconds);
         }
     }
 }

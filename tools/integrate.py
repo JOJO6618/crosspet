@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """把 CrossPet 接入各个 AI（或撤销）。install.sh / uninstall.sh 调用它，也可以单独用：
 
-    python3 tools/integrate.py install   claude-hooks | claude-mod | codex | deepseek | gemini | antigravity | workbuddy | zcode | hermes
-    python3 tools/integrate.py uninstall claude-hooks | claude-mod | codex | deepseek | gemini | antigravity | workbuddy | zcode | hermes
+    python3 tools/integrate.py install   claude-hooks | claude-mod | codex | deepseek | gemini | antigravity | workbuddy | zcode | hermes | astrion
+    python3 tools/integrate.py uninstall claude-hooks | claude-mod | codex | deepseek | gemini | antigravity | workbuddy | zcode | hermes | astrion
     python3 tools/integrate.py status
 
 原则：
@@ -20,7 +20,9 @@ from pathlib import Path
 
 HOME = Path.home()
 REPO = Path(__file__).resolve().parent.parent
-SUPPORT = Path(os.environ.get("CROSSPET_DATA_DIR") or (str(Path(os.environ.get("LOCALAPPDATA", str(HOME / "AppData/Local"))) / "CrossPet") if os.name == "nt" else str(HOME / "Library/Application Support/CrossPet")))
+SUPPORT = Path(os.environ.get("CROSSPET_DATA_DIR") or (
+    str(Path(os.environ.get("LOCALAPPDATA", str(HOME / "AppData/Local"))) / "CrossPet")
+    if os.name == "nt" else str(HOME / "Library/Application Support/CrossPet")))
 MARK = "crosspet-hook.py"
 
 
@@ -803,7 +805,62 @@ def has_hermes() -> bool:
     return HERMES_PLUGIN.is_dir() and (HERMES_PLUGIN / "plugin.yaml").exists()
 
 
-TARGETS = {"claude-hooks": claude_hooks, "claude-mod": claude_mod, "codex": codex, "deepseek": deepseek, "gemini": gemini, "antigravity": antigravity, "workbuddy": workbuddy, "zcode": zcode, "hermes": hermes}
+# Astrion's own settings switch controls export. This optional registration only
+# shares CrossPet's state directory; no credentials or Astrion config are edited.
+ASTRION_CONFIG = SUPPORT / "astrion.json"
+
+
+def astrion_registered() -> bool:
+    """用户是否在设置里登记过（写 astrion.json）——只有登记过才算「已接入」。"""
+    try:
+        data = load_json(ASTRION_CONFIG)
+        return data.get("version") == 1 and data.get("enabled") is True
+    except Exception:
+        return False
+
+
+def astrion_producing() -> bool:
+    """状态目录里是否正有新鲜的 Astrion 输出：只用于展示，不当作登记。"""
+    try:
+        state = STATE_DIR / "astrion-state.json"
+        if state.is_symlink() or not state.is_file() or state.stat().st_size > 1_000_000:
+            return False
+        value = load_json(state)
+        ts = value.get("ts")
+        return (value.get("version") == 1 and value.get("source") == "astrion"
+                and type(ts) in (int, float) and -10 <= time.time() - ts < 45)
+    except Exception:
+        return False
+
+
+def astrion(install: bool) -> None:
+    import tempfile
+    if ASTRION_CONFIG.is_symlink():
+        raise ValueError("Astrion 接入配置不能是符号链接")
+    if not install and not ASTRION_CONFIG.exists():
+        print("  → 没有登记，无需撤销")
+        return
+    data = load_json(ASTRION_CONFIG)
+    backup(ASTRION_CONFIG)
+    # 用户登记过的目录优先保留，别把它改回默认；只有没登记过才用环境变量/默认目录
+    existing = data.get("state_dir")
+    data.update(version=1, enabled=install)
+    if not (isinstance(existing, str) and existing.strip()):
+        data["state_dir"] = str(STATE_DIR.resolve())
+    SUPPORT.mkdir(parents=True, exist_ok=True)
+    fd, temporary = tempfile.mkstemp(prefix=".astrion-", suffix=".json", dir=SUPPORT)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as stream:
+            json.dump(data, stream, ensure_ascii=False, indent=2)
+            stream.write("\n")
+        os.replace(temporary, ASTRION_CONFIG)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+    print("  → 已登记 CrossPet 状态目录；请在 Astrion 设置 → 通用中打开 CrossPet 联动" if install else "  → 已取消 CrossPet 侧接入登记；状态输出仍由 Astrion 的 CrossPet 联动开关控制")
+
+
+TARGETS = {"claude-hooks": claude_hooks, "claude-mod": claude_mod, "codex": codex, "deepseek": deepseek, "gemini": gemini, "antigravity": antigravity, "workbuddy": workbuddy, "zcode": zcode, "hermes": hermes, "astrion": astrion}
 
 
 def has_hooks(p: Path) -> bool:
@@ -827,6 +884,7 @@ def installed() -> list:
     if any(has_hooks(d / "settings.json") for d in workbuddy_dirs()): result.append("workbuddy")
     if has_zcode() and found(ZCODE_HOME, "", ("cli",), quiet=True): result.append("zcode")
     if has_hermes(): result.append("hermes")
+    if astrion_registered(): result.append("astrion")
     return result
 
 
@@ -860,7 +918,7 @@ def plugin_status(ids=None, bundled: Path = None, plugin_dir: Path = None, state
     return [{"id": "deepseek", "label": "DeepSeek Harness", "bundled": _plugin_version(bundled),
              "installed": _plugin_version(plugin_dir / "lib/index.js"), "running": running}]
 SEEN_KEY = {"claude-hooks": "claude", "claude-mod": "claude-mod", "codex": "gpt", "deepseek": "deepseek", "gemini": "gemini",
-            "antigravity": "antigravity", "workbuddy": "workbuddy", "zcode": "zcode", "hermes": "hermes"}
+            "antigravity": "antigravity", "workbuddy": "workbuddy", "zcode": "zcode", "hermes": "hermes", "astrion": "astrion"}
 
 
 def short(p) -> str:
@@ -1062,6 +1120,9 @@ def diagnose() -> str:
     L.append(f"[Hermes] {short(HERMES_HOME)}（{'在' if HERMES_HOME.exists() else '不在'}），插件 {'在' if has_hermes() else '不在'}，"
              f"config.yaml 里启用 {'是' if hermes_on else '否'}；"
              f"环境变量 {env_line('HERMES_HOME')}；最近消息 {seen('hermes')}")
+    L.append(f"[Astrion] {file_state(ASTRION_CONFIG, astrion_registered)}；"
+             f"正在输出 {'是' if astrion_producing() else '否'}；最近消息 {seen('astrion')}；"
+             f"状态文件 {file_state(STATE_DIR / 'astrion-state.json')}")
     # 状态文件：各角色最近一次的状态
     states = []
     for f in sorted(STATE_DIR.glob("*-state.json")):
@@ -1102,6 +1163,8 @@ def status() -> None:
     print("WorkBuddy           :", "已接入" if any(has_hooks(d / "settings.json") for d in workbuddy_dirs()) else "未接入")
     print("ZCode               :", "已接入" if has_zcode() else "未接入")
     print("Hermes Agent        :", "已接入" if has_hermes() else "未接入")
+    print("Astrion             :", "已接入" if astrion_registered() else
+          "检测到它正在输出（还没登记）" if astrion_producing() else "未接入")
 
 
 if __name__ == "__main__":
@@ -1118,6 +1181,8 @@ if __name__ == "__main__":
         status()
     elif len(sys.argv) == 2 and sys.argv[1] == "refresh":
         for t in installed():
+            if t == "astrion":
+                continue   # Astrion 只登记目录、没有需要刷新的钩子；更新时也不改写用户登记
             print(f"更新 {t}：")
             TARGETS[t](True)
     elif len(sys.argv) == 2 and sys.argv[1] == "heal":   # 给桌宠用：被别的工具冲掉的接回去，输出接回去的目标（JSON 数组）

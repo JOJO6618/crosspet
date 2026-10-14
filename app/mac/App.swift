@@ -64,6 +64,8 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
 
     // 显示层级 用的
     var lastPose: [String: (pose: String, at: Date)] = [:]   // 各角色最近一次状态（判断 AI 在不在干活）
+    var astrionPoses: [String: (pose: String, at: Date)] = [:]
+    var astrionUpdatedAt = Date.distantPast
 
     // 贴边 用的
     var dock: String?            // "left" / "right"

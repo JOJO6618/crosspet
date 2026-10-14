@@ -101,6 +101,8 @@ input[type=range] { width: 150px; accent-color: var(--accent); }
 <div class="card" data-tab="quota">
   <div class="item"><div class="label"><span id="gptLabel">显示 GPT 额度<small id="gptNote">让电脑上的 Codex 自己查用量（不对话、不耗额度，不碰登录凭据）</small></span></div>
     <div class="ctl"><label class="switch"><input type="checkbox" data-key="gptQuota"><span></span></label></div></div>
+  <div class="item"><div class="label">显示 Astrion 的 GPT 额度<small>读取 Astrion 联动的订阅用量，与上方 GPT 额度显示互斥</small></div>
+    <div class="ctl"><label class="switch"><input type="checkbox" data-key="astrionGptQuota"><span></span></label></div></div>
   <div class="item"><div class="label">显示 Gemini 额度<small>询问本机正在运行的 Antigravity</small></div>
     <div class="ctl"><label class="switch"><input type="checkbox" data-key="agyQuota"><span></span></label></div></div>
   <div class="item"><div class="label">显示 DeepSeek 余额<small>DeepSeek Harness 插件查的官方账户余额，余额低时她会没精神；用 OpenCode Go 等别家订阅的话可以关掉</small></div>
@@ -199,6 +201,7 @@ const NEVER_SEEN = {
   workbuddy: '重开 WorkBuddy、开个新对话试试',
   zcode: '新开一个 ZCode 会话试试',
   hermes: '新开一个 Hermes 会话试试',
+  astrion: '在 Astrion 设置 → 通用中打开 CrossPet 联动，并确认运行支持协议 v1 的本机版本；云端任务不接入本机桌宠',
 }
 const agoText = s => s < 60 ? '刚刚' : s < 3600 ? `${Math.floor(s / 60)} 分钟前` : s < 86400 ? `${Math.floor(s / 3600)} 小时前` : `${Math.floor(s / 86400)} 天前`
 

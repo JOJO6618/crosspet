@@ -9,11 +9,12 @@ extension App {
     /// 读 /tmp/crosspet/<id>-state.json 和 <id>-quota.json，有变化就交给画面。
     func pollStates() {
         guard ready else { return }
+        pollAstrion()
         // current：多模型宿主（WorkBuddy）里没有对应角色的模型，由当前角色来演；它只有状态，没有额度
         for id in characterIds + ["current"] {
             // sessions：同一个 AI 好几个对话同时干活时，每个对话各自的状态（演「手忙脚乱」用）
             for kind in ["state", "quota", "sessions"] where !(id == "current" && kind == "quota") && !(id == "deepseek" && kind == "quota" && !dsQuotaEnabled) {
-                let url = stateDir.appendingPathComponent("\(id)-\(kind).json")
+                let url = stateFile("\(id)-\(kind).json")
                 let key = "\(id)-\(kind)"
                 guard let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
                       let stamp = attrs[.modificationDate] as? Date, stamp != stamps[key] else { continue }
@@ -41,8 +42,8 @@ extension App {
         updateDock()
         // 多模型宿主（DeepSeek Harness、WorkBuddy、ZCode，以及接了别家接口的 Claude Code、Codex）正在前台、
         // 里面换了模型：马上换成那个模型的角色
-        for host in ["deepseek", "workbuddy", "zcode", "claude", "gpt"] {
-            let url = stateDir.appendingPathComponent("\(host)-host.json")
+        for host in ["deepseek", "workbuddy", "zcode", "claude", "gpt", "astrion"] {
+            let url = stateFile("\(host)-host.json")
             guard let stamp = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date,
                   stamp != stamps["\(host)-host"] else { continue }
             stamps["\(host)-host"] = stamp

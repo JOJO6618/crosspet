@@ -76,7 +76,7 @@ namespace CrossPet
         bool DockBusy()
         {
             var now = DateTime.UtcNow;
-            return lastPose.Values.Any(p =>
+            return lastPose.Values.Concat(RecentAstrionPoses).Any(p =>
             {
                 if (p.at <= dockedAt) return false;
                 var age = (now - p.at).TotalSeconds;

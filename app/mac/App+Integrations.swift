@@ -16,6 +16,7 @@ extension App {
         ("workbuddy", "WorkBuddy", "按当前模型换角色"),
         ("zcode", "ZCode（智谱）", "按会话的模型换角色"),
         ("hermes", "Hermes Agent", "按当前模型换角色；新开的会话生效"),
+        ("astrion", "Astrion", "本机工作状态、多会话和审批等待；需要支持协议 v1 的 Astrion"),
     ]
     var integrateScript: URL? {
         let url = Bundle.main.resourceURL!.appendingPathComponent("tools/integrate.py")
@@ -60,7 +61,7 @@ extension App {
     // 钩子 / 插件每收到一条事件就在状态目录写 seen-<名字>（时间戳）。状态目录 /tmp 重启会清空，所以桌宠把读到的最新时间存进设置。
     // 设置里据此标出「接上了但从没收到过消息」，反馈里也带着
     static let seenKeys = ["claude-hooks": "claude", "claude-mod": "claude-mod", "codex": "gpt", "deepseek": "deepseek", "gemini": "gemini",
-                           "antigravity": "antigravity", "workbuddy": "workbuddy", "zcode": "zcode", "hermes": "hermes"]
+                           "antigravity": "antigravity", "workbuddy": "workbuddy", "zcode": "zcode", "hermes": "hermes", "astrion": "astrion"]
     var lastSeen: [String: Double] {
         get { (defaults.dictionary(forKey: "seen") as? [String: Double]) ?? [:] }
         set { defaults.set(newValue, forKey: "seen") }
@@ -68,7 +69,7 @@ extension App {
     func refreshSeen() {
         var seen = lastSeen, changed = false
         for key in Set(Self.seenKeys.values) {
-            guard let text = try? String(contentsOf: stateDir.appendingPathComponent("seen-\(key)"), encoding: .utf8),
+            guard let text = try? String(contentsOf: stateFile("seen-\(key)"), encoding: .utf8),
                   let ts = Double(text.trimmingCharacters(in: .whitespacesAndNewlines)), ts > (seen[key] ?? 0) else { continue }
             seen[key] = ts; changed = true
         }
@@ -187,6 +188,8 @@ extension App {
                 let on = value as? Bool ?? true; defaults.set(on, forKey: "eggs"); js("setEggsEnabled(\(on))")
             case "gptQuota":
                 if (value as? Bool ?? false) != defaults.bool(forKey: "gptQuota") { toggleGPTQuota() }
+            case "astrionGptQuota":
+                setAstrionGPTQuota(value as? Bool ?? false)
             case "agyQuota":
                 if (value as? Bool ?? false) != defaults.bool(forKey: "agyQuota") { toggleAntigravityQuota() }
             case "hideHotkey":

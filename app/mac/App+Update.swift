@@ -226,6 +226,7 @@ extension App {
         js("setAuraMode(\(quote(auraMode))); setShowName(\(showName)); setEggsEnabled(\(eggsEnabled)); setPowerSave(\(powerSave)); setQuotaAggregate(\(quotaAggregate))")
         applySizes(anchor: .corner)   // 解锁过文字大小的：按画布重设窗口，左下角不动（锁着的尺寸不变）
         updatePageHidden()
+        syncGPTQuotaOptions()
         stamps = [:]
         pollStates()
         refreshCodexQuota(.now)

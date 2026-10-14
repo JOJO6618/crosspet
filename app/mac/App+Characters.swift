@@ -105,11 +105,12 @@ extension App {
     func hostApp(_ bundle: String) -> String? {
         if bundle.hasPrefix("com.workbuddy.") { return "workbuddy" }
         if bundle == "dev.zcode.app" { return "zcode" }
+        if bundle == "com.astrion.desktop" { return "astrion" }
         return nil
     }
 
     func hostCharacter(_ id: String) -> String {
-        let url = stateDir.appendingPathComponent("\(id)-host.json")
+        let url = stateFile("\(id)-host.json")
         guard let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
               let stamp = attrs[.modificationDate] as? Date, Date().timeIntervalSince(stamp) < 86400,
               let data = try? Data(contentsOf: url),
@@ -117,6 +118,10 @@ extension App {
             // 还不知道它在用哪个模型（刚装好、还没对话过）：先按它默认的模型换，比如 ZCode 默认是 GLM
             if let d = Self.hostDefaults[id], characterIds.contains(d) { return d }
             return id
+        }
+        if id == "astrion" {
+            // Astrion 的状态随时在变：没有可用的时间戳、或者已经过了 45 秒，就不跟着它换
+            guard let ts = obj["ts"] as? Double, abs(Date().timeIntervalSince1970 - ts) <= 45 else { return id }
         }
         guard let c = obj["character"] as? String, characterIds.contains(c) else { return id }
         return c

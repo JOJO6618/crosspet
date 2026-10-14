@@ -166,6 +166,8 @@ addEventListener('error', e => { if (e.target && e.target.tagName === 'IMG' && e
 <script src="quota-aggregate.js"></script>
 <script src="plugin-update.js"></script>
 <script src="stand-in.js"></script>
+<script src="astrion.js"></script>
+<script src="astrion-quota.js"></script>
 <script>
 // CrossPet 画面：由 CrossPet.app（Swift 外壳）调用这几个函数
 //   init(manifest)          角色清单（characters/*/character.json + 立绘）
@@ -737,9 +739,9 @@ const SESSION_DONE_SHOW = 4  // 干完 / 出错的卡片停几秒
 const SESSION_FLIP = 1500    // 左右两帧多久换一次
 let multi = null             // 正在演：{ side, flipTimer, cards: Map(会话id → {el, pose, shownAt, pending}), order: [会话id] }
 
-function setSessions(id, map) {
+function setSessions(id, map, source = 'hooks') {
   if (id === 'current') id = charId
-  sessions[id] = map || {}
+  sessions[id] = petSourceSessions.set(id, source, map)
   refreshMulti()
 }
 function sessionKind(e, now) {
@@ -873,12 +875,15 @@ function endMulti() {
   watchStuck()
 }
 
-function applyCharState(id, s) {
+function applyCharState(id, s, source = 'hooks') {
   if (id === 'current') id = charId   // 多模型宿主里没有对应角色的模型（WorkBuddy 的混元、Kimi……）：由当前角色来演
   const own = id                      // 事件原本属于哪家 AI：先按它记下状态，切回那家的角色时看到的才是最新的
+  s = petSourceStates.accept(own, source, s, Date.now() / 1000)
+  if (!s) return                       // Astrion 侧心跳/过期/被别家盖住：这一条不用演（状态已记在 registry 里）
   charState[own] = s
-  if (standsIn(id)) id = charId       // 代演（reactTo）：别家 AI 的状态当成她自己的（多个会话同时干活时，由 refreshMulti 合并）
+  if (standsIn(own)) id = charId      // 代演（reactTo）：别家 AI 的状态当成她自己的（多个会话同时干活时，由 refreshMulti 合并）
   charState[id] = s
+  if (s._heartbeat) { if (id === charId && CrossPetAstrion.active(s)) watchStuck(); return }
   if (egg) { if (egg.host === own && s.pose && s.pose !== 'idle') endEgg(); return }
   if (id !== charId || !s.pose) return
   lastActive = Date.now()
@@ -950,11 +955,12 @@ function quotaEvent(id, q) {
   quotaMemory(m => {
     const prev = m[id] || {}, now = Date.now() / 1000
     if (Array.isArray(q.windows)) {
+      const sameSource = prev.origin === q.origin && prev.epoch === q.epoch
       for (const w of q.windows) {
         const p = (prev.windows || []).find(x => x.label === w.label)
-        if (p && p.reset && now < p.reset - 600 && p.used - w.used >= 15) ev = 'reset'
+        if (sameSource && q.source !== 'stale' && p && p.reset && now < p.reset - 600 && p.used - w.used >= 15) ev = 'reset'
       }
-      m[id] = { ...prev, windows: q.windows }
+      m[id] = { ...prev, windows: q.windows, origin: q.origin, epoch: q.epoch }
     }
     if (q.balances && typeof q.balances === 'object') {
       // 按币种分别比（#10）：人民币、美元都可能有，只是顺序变了或币种不同不算充值；某个币种多了才算。
@@ -985,8 +991,15 @@ function celebrate(id, ev) {
   revertTimer = setTimeout(() => { setPose(restPose()); say('') }, 6500)
 }
 
-// GPT 额度：外壳交来问 Codex 服务得到的原始额度（见 codex-quota.js），排好版再走 setQuota
-function setCodexQuota(p) { setQuota('gpt', p ? CodexQuota.view(p, Date.now() / 1000) : null) }
+// Codex keeps its original callback behavior; Astrion has a separate opt-in display.
+function setCodexQuota(p) {
+  codexQuotaSnapshot = p
+  if (astrionGPTQuotaEnabled) return
+  const view = p ? CodexQuota.view(p, Date.now() / 1000) : null
+  const q = view ? { ...view, origin: 'codex', epoch: 'codex' } : null
+  gptQuotaSignature = JSON.stringify(q)
+  setQuota('gpt', q)
+}
 function setQuota(id, q) {
   const wasLow = quota[id]?.low
   quota[id] = q
@@ -1297,4 +1310,5 @@ setInterval(() => {
   }, 3000 + Math.random() * 3500)
 })()
 </script>
+<script src="astrion-view.js"></script>
 </body></html>
